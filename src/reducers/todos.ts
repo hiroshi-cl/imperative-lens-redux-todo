@@ -1,4 +1,7 @@
-const todo = (state: any, action: any) => {
+import * as Redux from "redux";
+import {TodoItem} from "../entities/TodoItem";
+
+const todo = (state: TodoItem, action: Redux.Action & TodoItem) => {
   switch (action.type) {
     case "ADD_TODO":
       return {
@@ -19,7 +22,7 @@ const todo = (state: any, action: any) => {
   }
 };
 
-const todos = (state: any[] = [], action: any) => {
+const todos = (state: TodoItem[] = [], action: Redux.Action & TodoItem) => {
   switch (action.type) {
     case "ADD_TODO":
       return [
