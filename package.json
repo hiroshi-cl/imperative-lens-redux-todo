@@ -1,0 +1,27 @@
+{
+  "name": "imperative-lens-flux",
+  "version": "0.0.1",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "typings install",
+    "build": "webpack --progress --colors --config ./webpack.config.js",
+    "lint": "find src -name '*.ts*' -exec tslint {} \\;",
+    "doc": "typedoc --out doc ."
+  },
+  "devDependencies": {
+    "babel-core": "^6.13.2",
+    "babel-loader": "^6.2.5",
+    "babel-polyfill": "^6.13.0",
+    "babel-preset-es2015": "^6.13.2",
+    "react": "^15.3.0",
+    "react-dom": "^15.3.0",
+    "react-redux": "^4.4.5",
+    "redux": "^3.5.2",
+    "ts-loader": "^0.8.2",
+    "tslint": "^3.14.0",
+    "typedoc": "^0.4.5",
+    "typescript": "^1.8.10",
+    "typings": "^1.3.2",
+    "webpack": "^1.13.1"
+  }
+}
