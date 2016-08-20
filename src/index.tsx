@@ -1,5 +1,15 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import Hello from "./Hello";
+import * as ReactRedux from "react-redux";
+import * as Redux from "redux";
+import todoApp from "./reducers";
+import App from "./components/App";
 
-ReactDOM.render(<Hello content="hello world"/>, document.getElementById("app"));
+const store = Redux.createStore(todoApp);
+
+ReactDOM.render(
+  <ReactRedux.Provider store={store}>
+    <App />
+  </ReactRedux.Provider>,
+  document.getElementById("app")
+);

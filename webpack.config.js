@@ -1,12 +1,10 @@
-var webpack = require('webpack');
+const webpack = require('webpack');
 
 module.exports = {
-  entry: ['babel-polyfill', "./src/index.tsx"],
+  entry: ["babel-polyfill", "./src/index.tsx"],
   output: {
-    filename: "./dist/bundle.js"
+    filename: __dirname + "/dist/bundle.js"
   },
-
-  devtool: "source-map",
 
   resolve: {
     extensions: ["", ".ts", ".tsx", ".js"]
