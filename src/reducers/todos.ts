@@ -1,8 +1,8 @@
 import * as Redux from "redux";
 import {TodoItem} from "../entities/TodoItem";
-import Lens from "../lenses";
+import * as Lens from "../lenses";
 
-const completedLens = new Lens<TodoItem, boolean>(
+const completedLens = new Lens.Lens<TodoItem, boolean>(
   (todoItem) => todoItem.completed,
   (TodoItem) => (completed) => Object.assign({}, TodoItem, { completed })
 );
@@ -20,7 +20,7 @@ const todo = (state: TodoItem, action: Redux.Action & TodoItem) => {
         return state;
       }
 
-      return completedLens.over(state)((completed) => !completed);
+      return new Lens.Lensed(state, completedLens).over(completed => !completed);
     default:
       return state;
   }
