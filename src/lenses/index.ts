@@ -12,24 +12,82 @@ export class Lens<S, V> {
   }
 }
 
-export class Lensed<S, V> {
-  constructor(public state: S, public lens: Lens<S, V>) { }
+interface Ref<S> {
+  ref: S;
+}
+
+class LensedVar<S, V> {
+  constructor(public state: Ref<S>, public lens: Lens<S, V>) { }
 
   view() {
-    return this.lens.get(this.state);
+    return this.lens.get(this.state.ref);
   }
 
   set(value: V) {
-    return this.lens.put(this.state)(value);
+    const newState = this.lens.put(this.state.ref)(value);
+    return this.state.ref = newState;
   }
 
   over(f: (_: V) => V) {
-    return this.lens.put(this.state)(f(this.lens.get(this.state)));
+    const newState = this.lens.put(this.state.ref)(f(this.lens.get(this.state.ref)));
+    return this.state.ref = newState;
   }
 
   run(f: (_: V) => void) {
-    const value = Object.assign({}, this.lens.get(this.state));
+    const value = Object.assign({}, this.lens.get(this.state.ref));
     f(value);
-    return this.lens.put(this.state)(value);
+    const newState = this.lens.put(this.state.ref)(value);
+    return this.state.ref = newState;
   }
+
+  ref(name: string) {
+    const lens = new Lens(
+      (state: V) => (state as any)[name],
+      (state: V) => (value: any) => {
+        const newState = Object.assign({}, state);
+        (newState as any)[name] = value;
+        return newState;
+      }
+    );
+    return this.compose(lens);
+  }
+
+  compose<W>(lens: Lens<V, W>) {
+    return new LensedVar(
+      this.state,
+      this.lens.compose(lens)
+    );
+  }
+}
+
+declare class Proxy {
+  constructor(target: any, handler: any);
+};
+
+function handler<S, V>(lensed: LensedVar<S, V>) {
+  return {
+    get: (target: V, property: string, receiver: any) => {
+      if (property === "$") {
+        return lensed;
+      }
+      return new Proxy(undefined, handler(lensed.ref(property)));
+    },
+    set: (target: V, property: string, value: any, receiver: any) => {
+      lensed.ref(property).set(value);
+      return true;
+    },
+    apply: (target: V, thisArg: any, argumentsList: any[]) => {
+      console.log("apply");
+      return lensed.state.ref;
+    }
+  };
+};
+
+const selfLens = new Lens<any, any>(
+  state => state,
+  state => value => value
+);
+
+export function lensedVar<S>(obj: S): S {
+  return (new Proxy(obj, handler(new LensedVar({ ref: obj }, selfLens))) as any);
 }
