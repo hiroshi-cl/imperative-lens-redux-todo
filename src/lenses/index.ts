@@ -91,3 +91,5 @@ const selfLens = new Lens<any, any>(
 export function lensedVar<S>(obj: S): S {
   return (new Proxy(obj, handler(new LensedVar({ ref: obj }, selfLens))) as any);
 }
+
+// TODO: Lensed に root と node を作る。path を参照するクロージャを渡すと自動で lens が作られる感じで
