@@ -1,5 +1,11 @@
 import * as Redux from "redux";
 import {TodoItem} from "../entities/TodoItem";
+import Lens from "../lenses";
+
+const completedLens = new Lens<TodoItem, boolean>(
+  (todoItem) => todoItem.completed,
+  (TodoItem) => (completed) => Object.assign({}, TodoItem, { completed })
+);
 
 const todo = (state: TodoItem, action: Redux.Action & TodoItem) => {
   switch (action.type) {
@@ -14,9 +20,7 @@ const todo = (state: TodoItem, action: Redux.Action & TodoItem) => {
         return state;
       }
 
-      return Object.assign({}, state, {
-        completed: !state.completed
-      });
+      return completedLens.over(state)((completed) => !completed);
     default:
       return state;
   }
