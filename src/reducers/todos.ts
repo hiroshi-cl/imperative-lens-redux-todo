@@ -20,9 +20,9 @@ const todo = (state: TodoItem, action: Redux.Action & TodoItem) => {
         return state;
       }
 
-      const lv = Lens.lensedVar(state);
-      lv.completed = !state.completed;
-      return (lv as any).$.view();
+      const lv = new Lens.LensedVar(state);
+      lv.lift(state => state.completed).over(completed => !completed); // state と completed が冗長
+      return lv.view();
 
     default:
       return state;

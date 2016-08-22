@@ -12,84 +12,102 @@ export class Lens<S, V> {
   }
 }
 
-interface Ref<S> {
-  ref: S;
-}
-
-class LensedVar<S, V> {
-  constructor(public state: Ref<S>, public lens: Lens<S, V>) { }
-
-  view() {
-    return this.lens.get(this.state.ref);
-  }
-
-  set(value: V) {
-    const newState = this.lens.put(this.state.ref)(value);
-    return this.state.ref = newState;
-  }
-
-  over(f: (_: V) => V) {
-    const newState = this.lens.put(this.state.ref)(f(this.lens.get(this.state.ref)));
-    return this.state.ref = newState;
-  }
-
-  run(f: (_: V) => void) {
-    const value = Object.assign({}, this.lens.get(this.state.ref));
-    f(value);
-    const newState = this.lens.put(this.state.ref)(value);
-    return this.state.ref = newState;
-  }
-
-  ref(name: string) {
-    const lens = new Lens(
-      (state: V) => (state as any)[name],
-      (state: V) => (value: any) => {
-        const newState = Object.assign({}, state);
-        (newState as any)[name] = value;
-        return newState;
-      }
-    );
-    return this.compose(lens);
-  }
-
-  compose<W>(lens: Lens<V, W>) {
-    return new LensedVar(
-      this.state,
-      this.lens.compose(lens)
-    );
-  }
+function propertyLens<S, V>(name: string): Lens<S, V> {
+  return new Lens(
+    (state: S) => (state as any)[name],
+    (state: S) => (value: V) => {
+      const newState = Object.assign({}, state);
+      (newState as any)[name] = value;
+      return newState;
+    }
+  );
 }
 
 declare class Proxy {
   constructor(target: any, handler: any);
 };
 
-function handler<S, V>(lensed: LensedVar<S, V>) {
-  return {
-    get: (target: V, property: string, receiver: any) => {
-      if (property === "$") {
-        return lensed;
-      }
-      return new Proxy(undefined, handler(lensed.ref(property)));
-    },
-    set: (target: V, property: string, value: any, receiver: any) => {
-      lensed.ref(property).set(value);
-      return true;
-    },
-    apply: (target: V, thisArg: any, argumentsList: any[]) => {
-      console.log("apply");
-      return lensed.state.ref;
-    }
-  };
+const handler = {
+  get: (target: Lens<any, any>, property: string, receiver: any) => {
+    if (property === "$")
+      return target;
+    else if (target instanceof Lens)
+      return new Proxy(target.compose(propertyLens(property)), handler);
+    else
+      return new Proxy(propertyLens(property), handler);
+  }
 };
 
-const selfLens = new Lens<any, any>(
-  state => state,
-  state => value => value
-);
-
-export function lensedVar<S>(obj: S): S {
-  return (new Proxy(obj, handler(new LensedVar({ ref: obj }, selfLens))) as any);
+export interface Lensed<S, V> {
+  view: () => V;
+  set: (value: V) => S;
+  over: (f: (_: V) => V) => S;
+  run: (f: (_: V) => void) => S;
+  lift: <W> (f: (_: V) => W) => Lensed<S, W>;
+  apply: <W> (lens: Lens<V, W>) => Lensed<S, W>;
 }
 
-// TODO: Lensed に root と node を作る。path を参照するクロージャを渡すと自動で lens が作られる感じで
+export class LensedVar<S> implements Lensed<S, S> {
+  constructor(public state: S) { }
+
+  view(): S {
+    return this.state;
+  }
+
+  set(state: S): S {
+    return this.state = state;
+  }
+
+  over(f: (_: S) => S): S {
+    return this.state = f(this.state);
+  }
+
+  run(f: (_: S) => void): S {
+    const state = Object.assign({}, this.state);
+    f(state);
+    return this.state = state;
+  }
+
+  lift<V>(f: (_: S) => V): Lensed<S, V> {
+    return this.apply((f(new Proxy({}, handler) as S) as any).$ as Lens<S, V>);
+  }
+
+  apply<V>(lens: Lens<S, V>): Lensed<S, V> {
+    return new LensedRef(this, lens);
+  };
+}
+
+// lift とかを他のやつと融合させたい
+
+class LensedRef<S, V> implements Lensed<S, V> {
+  constructor(public root: LensedVar<S>, public lens: Lens<S, V>) { }
+
+  view(): V {
+    return this.lens.get(this.root.state);
+  }
+
+  set(value: V): S {
+    const newState = this.lens.put(this.root.state)(value);
+    return this.root.state = newState;
+  }
+
+  over(f: (_: V) => V): S {
+    const newState = this.lens.put(this.root.state)(f(this.lens.get(this.root.state)));
+    return this.root.state = newState;
+  }
+
+  run(f: (_: V) => void): S {
+    const value = Object.assign({}, this.lens.get(this.root.state));
+    f(value);
+    const newState = this.lens.put(this.root.state)(value);
+    return this.root.state = newState;
+  }
+
+  lift<W>(f: (_: V) => W): Lensed<S, W> {
+    return this.apply((f(new Proxy(this.lens, handler) as V) as any).$ as Lens<V, W>);
+  }
+
+  apply<W>(lens: Lens<V, W>): Lensed<S, W> {
+    return new LensedRef(this.root, this.lens.compose(lens));
+  };
+}
