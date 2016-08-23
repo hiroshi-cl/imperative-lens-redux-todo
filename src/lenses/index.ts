@@ -12,8 +12,12 @@ export class Lens<S, V> {
   }
 }
 
+export function lens<S, V>(get: (state: S) => V, put: (state: S) => (value: V) => S) {
+  return new Lens(get, put);
+}
+
 function propertyLens<S, V>(name: string): Lens<S, V> {
-  return new Lens(
+  return lens(
     (state: S) => (state as any)[name],
     (state: S) => (value: V) => {
       const newState = Object.assign({}, state);
@@ -28,26 +32,24 @@ declare class Proxy {
 };
 
 const handler = {
-  get: (target: Lens<any, any>, property: string, receiver: any) => {
+  get: (target: Lensed<any, any>, property: string, receiver: any) => {
     if (property === "$")
       return target;
-    else if (target instanceof Lens)
-      return new Proxy(target.compose(propertyLens(property)), handler);
     else
-      return new Proxy(propertyLens(property), handler);
+      return new Proxy(target.apply(propertyLens(property)), handler);
   }
 };
 
 export interface Lensed<S, V> {
+  $: V;
   view: () => V;
   set: (value: V) => S;
   over: (f: (_: V) => V) => S;
   run: (f: (_: V) => void) => S;
-  lift: <W> (f: (_: V) => W) => Lensed<S, W>;
   apply: <W> (lens: Lens<V, W>) => Lensed<S, W>;
 }
 
-export class LensedVar<S> implements Lensed<S, S> {
+class LensedVar<S> implements Lensed<S, S> {
   constructor(public state: S) { }
 
   view(): S {
@@ -68,16 +70,12 @@ export class LensedVar<S> implements Lensed<S, S> {
     return this.state = state;
   }
 
-  lift<V>(f: (_: S) => V): Lensed<S, V> {
-    return this.apply((f(new Proxy({}, handler) as S) as any).$ as Lens<S, V>);
-  }
+  $ = new Proxy(this, handler) as S
 
   apply<V>(lens: Lens<S, V>): Lensed<S, V> {
     return new LensedRef(this, lens);
   };
 }
-
-// lift とかを他のやつと融合させたい
 
 class LensedRef<S, V> implements Lensed<S, V> {
   constructor(public root: LensedVar<S>, public lens: Lens<S, V>) { }
@@ -103,11 +101,33 @@ class LensedRef<S, V> implements Lensed<S, V> {
     return this.root.state = newState;
   }
 
-  lift<W>(f: (_: V) => W): Lensed<S, W> {
-    return this.apply((f(new Proxy(this.lens, handler) as V) as any).$ as Lens<V, W>);
-  }
+  $ = new Proxy(this, handler) as V;
 
   apply<W>(lens: Lens<V, W>): Lensed<S, W> {
     return new LensedRef(this.root, this.lens.compose(lens));
   };
+}
+
+export function lensed<S>(state: S) {
+  return new LensedVar(state);
+}
+
+export function $<V>(path: V): Lensed<any, V> {
+  return (path as any).$;
+}
+
+export function view<V>(path: V): () => V {
+  return () => $(path).view();
+}
+
+export function set<V>(path: V): (value: V) => any {
+  return (value: V) => $(path).set(value);
+}
+
+export function over<V>(path: V): (f: (_: V) => V) => any {
+  return (f: (_: V) => V) => $(path).over(f);
+}
+
+export function run<V>(path: V): (f: (_: V) => void) => any {
+  return (f: (_: V) => void) => $(path).run(f);
 }
